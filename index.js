@@ -187,7 +187,6 @@ bot.command('stats', async (ctx) => {
             message += `\n📝 Test #${index + 1} (${set.date.toLocaleDateString()})\n`;
             message += `✅ To‘g‘ri javoblar: ${set.correctAnswers}\n`;
             message += `❌ Noto‘g‘ri javoblar: ${set.wrongAnswers}\n`;
-            message += `⏱️ Umumiy vaqt: ${totalTime}\n`;
             message += `----------------------------------`;
         });
         ctx.reply(message);
