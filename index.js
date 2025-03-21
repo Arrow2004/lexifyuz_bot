@@ -117,7 +117,7 @@ async function sendDailyQuiz() {
                 await bot.telegram.sendPoll(user.userId, quiz.question, quiz.options, {
                     type: 'quiz',
                     correct_option_id: quiz.correct_option_id,
-                    is_anonymous: false,
+                    is_anonymous: true,
                     explanation: 'Keling, ingliz tilini o‘rganamiz! 📚'
                 });
             }
