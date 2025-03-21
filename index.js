@@ -3,7 +3,7 @@ const dotenv = require("dotenv");
 const mongoose = require('mongoose');
 const Word = require("./Models/wordModel")
 const QuizSet = require("./Models/qiuzsetModel")
-const {User} = require("./Models/userModel")
+const { User } = require("./Models/userModel")
 const cron = require('node-cron');
 dotenv.config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -76,7 +76,13 @@ async function sendNextQuiz(chatId) {
                 open_period: 30
             });
         } else {
-            bot.telegram.sendMessage(chatId, "🏆 Sizning testlaringiz tugadi! Yana davom etish uchun /quiz yozing.");
+            let quizSet = await QuizSet.findOne({ userId: chatId }).sort({ date: -1 });
+            let message = "📊 Sizning test natijangiz:";
+            message += `\n📝 Test  (${quizSet.date.toLocaleDateString()})\n`;
+            message += `✅ To‘g‘ri javoblar: ${quizSet.correctAnswers}\n`;
+            message += `❌ Noto‘g‘ri javoblar: ${quizSet.wrongAnswers}\n`;
+            bot.telegram.sendMessage(chatId, "🏆 Sizning testlaringiz tugadi! Yana davom etish uchun /quiz yozing.\n"+message);
+
         }
     } catch (error) {
         console.log(error)
@@ -130,18 +136,18 @@ cron.schedule("0 8,11,14,17,20 * * *", () => {
     timezone: "Asia/Tashkent" // Toshkent vaqti bo‘yicha
 });
 
-bot.command('start', async (ctx)=>{
+bot.command('start', async (ctx) => {
     try {
         const userId = ctx.from.id;
         const firstName = ctx.chat.first_name
-        let user = await User.findOne({userId: userId})
-        if (!user){
-            user = await User.create({userId,firstName})
+        let user = await User.findOne({ userId: userId })
+        if (!user) {
+            user = await User.create({ userId, firstName })
             ctx.reply(`Assalomu alaykum. Botimizga xush kelibsiz!
                 Bot yordamida siz ingliz tiliga oid yangi so'zlarni  yanada osonroq o'rganishingiz mumkin.
                 /quiz - 10 talik test ishlashingiz mumkim
                 /stats - o'z ishlagan testlaringiz statistikasini ko'rib borishingiz mumkin`)
-        }else{
+        } else {
             ctx.reply(`Assalomu alaykum. Botimizga xush kelibsiz!
                 Bot yordamida siz ingliz tiliga oid yangi so'zlarni  yanada osonroq o'rganishingiz mumkin.
                 /quiz - 10 talik test ishlashingiz mumkim
@@ -162,7 +168,7 @@ bot.command('quiz', async (ctx) => {
         const quizzes = await generateQuizQuestions();
 
         if (quizzes.length > 0) {
-            userQuizzes.set(chatId, { userId, quizzes, startTime: new Date() });  // ⏳ Start vaqtini saqlash
+            userQuizzes.set(chatId, { userId, quizzes});  // ⏳ Start vaqtini saqlash
             sendNextQuiz(chatId);
         } else {
             ctx.reply("Xatolik yuz berdi, qayta urinib ko‘ring.");
