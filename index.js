@@ -20,24 +20,19 @@ const userQuizzes = new Map();  // { chatId: { userId, quizzes } }
 
 // Tasodifiy so‘zlarni olish
 async function getRandomWords(limit) {
-    let words = await Word.find();
-    words = words.sort(() => Math.random() - 0.5).slice(0, limit);
-    return words;
+    return await Word.aggregate([{ $sample: { size: limit } }]);
+
 }
 
 // Quiz yaratish
 async function generateQuizQuestions() {
     const words = await getRandomWords(10); // 10 ta tasodifiy so‘z
     let quizzes = [];
-
     for (let word of words) {
         let options = await getRandomWords(3); // 3 ta noto‘g‘ri javob
         options.push(word); // To‘g‘ri javob qo‘shiladi
-
-        // Variantlarni shuffle qilish
         options = options.sort(() => Math.random() - 0.5);
         let correctIndex = options.findIndex(opt => opt._id.toString() === word._id.toString());
-
         quizzes.push({
             question: `"${word.word_en}" so'zining tarjimasi qaysi?`,
             options: options.map(opt => opt.word_uz),
@@ -51,12 +46,10 @@ async function generateQuizQuestions() {
 async function sendNextQuiz(chatId) {
     try {
         let session = userQuizzes.get(chatId);
-
         if (session && session.quizzes.length > 0) {
             let quiz = session.quizzes.shift();
             session.lastQuiz = quiz;
             userQuizzes.set(chatId, session);
-
             // Agar bu yangi 10 talik bo‘lsa, yangi `QuizSet` yaratamiz
             if (session.quizzes.length === 9) {
                 const newQuizSet = new QuizSet({
@@ -67,7 +60,6 @@ async function sendNextQuiz(chatId) {
                 });
                 await newQuizSet.save();
             }
-
             await bot.telegram.sendPoll(chatId, quiz.question, quiz.options, {
                 type: 'quiz',
                 correct_option_id: quiz.correct_option_id,
@@ -81,7 +73,7 @@ async function sendNextQuiz(chatId) {
             message += `\n📝 Test  (${quizSet.date.toLocaleDateString()})\n`;
             message += `✅ To‘g‘ri javoblar: ${quizSet.correctAnswers}\n`;
             message += `❌ Noto‘g‘ri javoblar: ${quizSet.wrongAnswers}\n`;
-            bot.telegram.sendMessage(chatId, "🏆 Sizning testlaringiz tugadi! Yana davom etish uchun /quiz yozing.\n"+message);
+            bot.telegram.sendMessage(chatId, "🏆 Sizning testlaringiz tugadi! Yana davom etish uchun /quiz yozing.\n" + message);
 
         }
     } catch (error) {
@@ -91,26 +83,27 @@ async function sendNextQuiz(chatId) {
 
 
 //daily quizes
-
 async function generateQuiz() {
-    let words = await Word.aggregate([{ $sample: { size: 4 } }]); // 4 ta so‘z tanlash
-    if (words.length < 4) return null;
+    try {
+        let words = await Word.aggregate([{ $sample: { size: 4 } }]); // 4 ta so‘z tanlash
+        if (words.length < 4) return null;
 
-    let correctWord = words[0]; // To‘g‘ri javob
-    let options = words.sort(() => Math.random() - 0.5); // Aralashtirish
+        let correctWord = words[0]; // To‘g‘ri javob
+        let options = words.sort(() => Math.random() - 0.5); // Aralashtirish
 
-    return {
-        question: `"${correctWord.word_en}" so‘zining tarjimasi qaysi?`,
-        options: options.map(opt => opt.word_uz),
-        correct_option_id: options.findIndex(opt => opt._id.toString() === correctWord._id.toString())
-    };
+        return {
+            question: `"${correctWord.word_en}" so‘zining tarjimasi qaysi?`,
+            options: options.map(opt => opt.word_uz),
+            correct_option_id: options.findIndex(opt => opt._id.toString() === correctWord._id.toString())
+        };
+    } catch (error) {
+        console.log(error)
+    }
 }
-
 // **Foydalanuvchilarga quiz yuborish**
 async function sendDailyQuiz() {
     try {
         userIds = await User.find().select('userId -_id')
-        console.log(userIds)
         const quiz = await generateQuiz();
         for (let user of userIds) {
             if (quiz) {
@@ -126,8 +119,6 @@ async function sendDailyQuiz() {
         console.log(error)
     }
 }
-
-
 cron.schedule("0 8,11,14,17,20 * * *", () => {
     console.log("📢 Har kungi quiz yuborildi!");
     sendDailyQuiz();
@@ -135,7 +126,6 @@ cron.schedule("0 8,11,14,17,20 * * *", () => {
     scheduled: true,
     timezone: "Asia/Tashkent" // Toshkent vaqti bo‘yicha
 });
-
 bot.command('start', async (ctx) => {
     try {
         const userId = ctx.from.id;
@@ -159,16 +149,15 @@ bot.command('start', async (ctx) => {
         ctx.reply("Xatolik yuzaga keldi. Iltimos adminga habar bering! @akbar_abdusattorov");
     }
 })
-
 // `/quiz` komandasi – birinchi testni yuborish
 bot.command('quiz', async (ctx) => {
     try {
         const chatId = ctx.chat.id;
         const userId = ctx.from.id;
         const quizzes = await generateQuizQuestions();
-
+        ctx.reply("Savollar tayyorlanmoqda... iltimos kutib turing")
         if (quizzes.length > 0) {
-            userQuizzes.set(chatId, { userId, quizzes});  // ⏳ Start vaqtini saqlash
+            userQuizzes.set(chatId, { userId, quizzes });  // ⏳ Start vaqtini saqlash
             sendNextQuiz(chatId);
         } else {
             ctx.reply("Xatolik yuz berdi, qayta urinib ko‘ring.");
